@@ -1,7 +1,5 @@
 package com.google.android.settings.display
 
-// import com.android.settingslib.metadata.PreferenceCategory
-// import com.google.android.settings.R
 import android.content.Context
 import com.android.settings.display.DisplayScreen
 import com.android.settings.dream.ScreensaverScreen
@@ -17,14 +15,7 @@ class DisplayGoogleScreen : DisplayScreen() {
         super.getPreferenceHierarchy(context, coroutineScope).apply {
             -ScreensaverScreen.KEY
             onGroup("category_key_appearance") { +ScreensaverScreen.KEY }
-            /*
-            +PreferenceCategory(
-                "category_touch",
-                R.string.category_touch_purpose,
-                R.string.touch_category_title,
-            ) order -160 += {
-                +"touch_sensitivity_settings_page"
-            }
-            */
+            // Stock also adds category_touch (touch_sensitivity_settings_page) at order -160,
+            // left out until touch sensitivity is ported.
         }
 }
