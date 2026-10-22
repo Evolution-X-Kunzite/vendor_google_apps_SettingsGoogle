@@ -31,7 +31,8 @@ public class AdvancedVpnFeatureProviderGoogleImpl extends AdvancedVpnFeatureProv
 
     @Override
     public boolean isAdvancedVpnSupported(Context context) {
-        return context.getResources().getBoolean(R.bool.config_advanced_vpn_enabled);
+        return context.getResources()
+                .getBoolean(com.android.settings.R.bool.config_advanced_vpn_enabled);
     }
 
     @Override

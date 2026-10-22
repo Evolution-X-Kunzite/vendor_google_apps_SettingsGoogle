@@ -1,9 +1,9 @@
 package com.google.android.settings.wifi.factory
 
 import android.content.Context
-import com.android.settings.R
 import com.android.settings.wifi.dpp.WifiDppQrCodeGeneratorFragment
 import com.android.settings.wifi.factory.WifiFeatureProvider
+import com.google.android.settings.R
 import com.google.android.settings.experiments.PhenotypeProxy
 import com.google.android.settings.wifi.dpp.WifiDppQrCodeGeneratorFragmentGoogleImpl
 

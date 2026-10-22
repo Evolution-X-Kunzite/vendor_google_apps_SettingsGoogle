@@ -37,7 +37,7 @@ class AdaptiveBatteryScreen(context: Context) :
         get() = KEY
 
     override val title: Int
-        get() = AR.string.smart_battery_title
+        get() = R.string.smart_battery_title
 
     override val purpose: Int
         get() = R.string.adaptive_battery_entry_purpose
