@@ -75,7 +75,7 @@ class SoftwareUpdateScreen :
     override fun getLaunchIntent(context: Context, metadata: PreferenceMetadata?): Intent =
         makeLaunchIntent(context, SoftwareUpdateActivity::class.java, metadata?.key)
 
-    inner class SoftwareUpdateScreenPreference(private val screenMetadata: SoftwareUpdateScreen) :
+    class SoftwareUpdateScreenPreference(private val screenMetadata: SoftwareUpdateScreen) :
         PreferenceMetadata,
         PreferenceSummaryProvider,
         PreferenceAvailabilityProvider,
