@@ -23,8 +23,6 @@ import com.google.android.setupdesign.items.RecyclerItemAdapter;
 import com.google.android.setupdesign.template.HeaderMixin;
 import com.google.android.setupdesign.util.ThemeHelper;
 
-import java.io.Serializable;
-
 public class SetupSystemLocalePickerActivity extends Activity {
     private RecyclerItemAdapter mAdapter;
     private ViewTreeObserver.OnGlobalFocusChangeListener mFocusChangeListener = null;
@@ -78,7 +76,7 @@ public class SetupSystemLocalePickerActivity extends Activity {
 
     private void setupContent() {
         GlifRecyclerLayout layout = findViewById(R.id.setup_wizard_language_picker_layout);
-        ((HeaderMixin) layout.getMixin(HeaderMixin.class)).getTextView().setVisibility(View.GONE);
+        layout.getMixin(HeaderMixin.class).getTextView().setVisibility(View.GONE);
         ImageView imageView = findViewById(com.google.android.setupdesign.R.id.sud_layout_icon);
         if (getResources()
                         .getBoolean(
@@ -103,50 +101,39 @@ public class SetupSystemLocalePickerActivity extends Activity {
         mRecyclerView = layout.getRecyclerView();
         mAdapter = (RecyclerItemAdapter) layout.getAdapter();
         LocaleSelectedListener localeSelectedListener =
-                new LocaleSelectedListener() {
-                    @Override
-                    public void onLocaleSelected(LocaleStore.LocaleInfo localeInfo) {
-                        int isSuggestedLocale =
-                                Settings.Global.getInt(
-                                        getApplicationContext().getContentResolver(),
-                                        "is_suggested_locale",
-                                        0);
-                        Intent intent = new Intent();
-                        intent.putExtra("localeInfo", (Serializable) localeInfo);
-                        intent.putExtra("EXTRA_IS_SUGGESTED_LOCALE", isSuggestedLocale);
-                        setResult(Activity.RESULT_OK, intent);
-                        finish();
-                    }
+                localeInfo -> {
+                    int isSuggestedLocale =
+                            Settings.Global.getInt(
+                                    getApplicationContext().getContentResolver(),
+                                    "is_suggested_locale",
+                                    0);
+                    Intent intent = new Intent();
+                    intent.putExtra("localeInfo", localeInfo);
+                    intent.putExtra("EXTRA_IS_SUGGESTED_LOCALE", isSuggestedLocale);
+                    setResult(Activity.RESULT_OK, intent);
+                    finish();
                 };
         mFocusChangeListener =
-                new ViewTreeObserver.OnGlobalFocusChangeListener() {
-                    @Override
-                    public void onGlobalFocusChanged(View oldFocus, View newFocus) {
-                        if (mRecyclerView == null
-                                || mAdapter == null
-                                || newFocus == null
-                                || newFocus.getParent() != mRecyclerView) {
+                (oldFocus, newFocus) -> {
+                    if (mRecyclerView == null
+                            || mAdapter == null
+                            || newFocus == null
+                            || newFocus.getParent() != mRecyclerView) {
+                        return;
+                    }
+                    if (mRecyclerView.getLayoutManager()
+                            instanceof LinearLayoutManager linearLayoutManager) {
+                        int position = mRecyclerView.getChildAdapterPosition(newFocus);
+                        int itemCount = mAdapter.getItemCount();
+                        if (position == RecyclerView.NO_POSITION || position >= itemCount) {
                             return;
                         }
-                        RecyclerView.LayoutManager layoutManager = mRecyclerView.getLayoutManager();
-                        if (layoutManager instanceof LinearLayoutManager) {
-                            LinearLayoutManager linearLayoutManager =
-                                    (LinearLayoutManager) layoutManager;
-                            int childAdapterPosition =
-                                    mRecyclerView.getChildAdapterPosition(newFocus);
-                            int itemCount = mAdapter.getItemCount();
-                            if (childAdapterPosition == -1 || childAdapterPosition >= itemCount) {
-                                return;
-                            }
-                            int findLastVisibleItemPosition =
-                                    linearLayoutManager.findLastVisibleItemPosition();
-                            int i = findLastVisibleItemPosition + 1;
-                            if (childAdapterPosition != findLastVisibleItemPosition
-                                    || i >= itemCount) {
-                                return;
-                            }
-                            mRecyclerView.smoothScrollToPosition(i);
+                        int lastVisiblePosition = linearLayoutManager.findLastVisibleItemPosition();
+                        int nextPosition = lastVisiblePosition + 1;
+                        if (position != lastVisiblePosition || nextPosition >= itemCount) {
+                            return;
                         }
+                        mRecyclerView.smoothScrollToPosition(nextPosition);
                     }
                 };
         ScrollView scrollView =
@@ -176,11 +163,10 @@ public class SetupSystemLocalePickerActivity extends Activity {
                                 getApplicationContext().getContentResolver(),
                                 "is_suggested_locale",
                                 0);
-                LocaleStore.LocaleInfo serializableExtra =
+                LocaleStore.LocaleInfo localeInfo =
                         (LocaleStore.LocaleInfo) data.getSerializableExtra("localeInfo");
                 Intent intent = new Intent();
-                intent.putExtra(
-                        "EXTRA_SELECTED_LOCALE", serializableExtra.getLocale().toLanguageTag());
+                intent.putExtra("EXTRA_SELECTED_LOCALE", localeInfo.getLocale().toLanguageTag());
                 intent.putExtra("EXTRA_IS_SUGGESTED_LOCALE", isSuggestedLocale);
                 setResult(Activity.RESULT_OK, intent);
             }

@@ -3,7 +3,6 @@ package com.google.android.settings.localepicker;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.view.ViewTreeObserver;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -15,8 +14,6 @@ import com.google.android.settings.R;
 import com.google.android.setupdesign.GlifRecyclerLayout;
 import com.google.android.setupdesign.items.RecyclerItemAdapter;
 import com.google.android.setupdesign.util.ThemeHelper;
-
-import java.io.Serializable;
 
 public class SetupRegionAndNumberingSystemActivity extends Activity {
     private static final int REQUEST_LOCALE_PICKER = 0;
@@ -98,44 +95,33 @@ public class SetupRegionAndNumberingSystemActivity extends Activity {
         mRecyclerView = layout.getRecyclerView();
         mAdapter = (RecyclerItemAdapter) layout.getAdapter();
         LocaleSelectedListener listener =
-                new LocaleSelectedListener() {
-                    @Override
-                    public void onLocaleSelected(LocaleStore.LocaleInfo localeInfo) {
-                        Intent intent = new Intent();
-                        intent.putExtra("localeInfo", (Serializable) localeInfo);
-                        setResult(RESULT_OK, intent);
-                        finish();
-                    }
+                localeInfo -> {
+                    Intent intent = new Intent();
+                    intent.putExtra("localeInfo", localeInfo);
+                    setResult(RESULT_OK, intent);
+                    finish();
                 };
         mFocusChangeListener =
-                new ViewTreeObserver.OnGlobalFocusChangeListener() {
-                    @Override
-                    public void onGlobalFocusChanged(View oldFocus, View newFocus) {
-                        if (mRecyclerView == null
-                                || mAdapter == null
-                                || newFocus == null
-                                || newFocus.getParent() != mRecyclerView) {
+                (oldFocus, newFocus) -> {
+                    if (mRecyclerView == null
+                            || mAdapter == null
+                            || newFocus == null
+                            || newFocus.getParent() != mRecyclerView) {
+                        return;
+                    }
+                    if (mRecyclerView.getLayoutManager()
+                            instanceof LinearLayoutManager linearLayoutManager) {
+                        int position = mRecyclerView.getChildAdapterPosition(newFocus);
+                        int itemCount = mAdapter.getItemCount();
+                        if (position == RecyclerView.NO_POSITION || position >= itemCount) {
                             return;
                         }
-                        RecyclerView.LayoutManager layoutManager = mRecyclerView.getLayoutManager();
-                        if (layoutManager instanceof LinearLayoutManager) {
-                            LinearLayoutManager linearLayoutManager =
-                                    (LinearLayoutManager) layoutManager;
-                            int childAdapterPosition =
-                                    mRecyclerView.getChildAdapterPosition(newFocus);
-                            int itemCount = mAdapter.getItemCount();
-                            if (childAdapterPosition == -1 || childAdapterPosition >= itemCount) {
-                                return;
-                            }
-                            int findLastVisibleItemPosition =
-                                    linearLayoutManager.findLastVisibleItemPosition();
-                            int i = findLastVisibleItemPosition + 1;
-                            if (childAdapterPosition != findLastVisibleItemPosition
-                                    || i >= itemCount) {
-                                return;
-                            }
-                            mRecyclerView.smoothScrollToPosition(i);
+                        int lastVisiblePosition = linearLayoutManager.findLastVisibleItemPosition();
+                        int nextPosition = lastVisiblePosition + 1;
+                        if (position != lastVisiblePosition || nextPosition >= itemCount) {
+                            return;
                         }
+                        mRecyclerView.smoothScrollToPosition(nextPosition);
                     }
                 };
         SetupLocalePickerListController controller =
@@ -149,10 +135,10 @@ public class SetupRegionAndNumberingSystemActivity extends Activity {
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_LOCALE_PICKER && resultCode == RESULT_OK) {
             if (data != null) {
-                LocaleStore.LocaleInfo serializableExtra =
+                LocaleStore.LocaleInfo localeInfo =
                         (LocaleStore.LocaleInfo) data.getSerializableExtra("localeInfo");
                 Intent intent = new Intent();
-                intent.putExtra("localeInfo", (Serializable) serializableExtra);
+                intent.putExtra("localeInfo", localeInfo);
                 setResult(RESULT_OK, intent);
             }
             finish();

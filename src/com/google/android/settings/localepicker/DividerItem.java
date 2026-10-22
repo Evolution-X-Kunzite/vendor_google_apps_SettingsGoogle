@@ -60,12 +60,12 @@ public class DividerItem extends AbstractItem {
         return mLayoutRes;
     }
 
-    public void setVisible(boolean z) {
-        if (mVisible == z) {
+    public void setVisible(boolean visible) {
+        if (mVisible == visible) {
             return;
         }
-        mVisible = z;
-        if (!z) {
+        mVisible = visible;
+        if (!visible) {
             notifyItemRangeRemoved(0, 1);
         } else {
             notifyItemRangeInserted(0, 1);

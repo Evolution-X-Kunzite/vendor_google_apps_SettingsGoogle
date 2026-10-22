@@ -21,23 +21,14 @@ public class LocalePickerSetupWizardEventsReceiver extends BroadcastReceiver {
             Locale locale = LocaleList.getDefault().get(0);
             if (locale.getCountry().isEmpty()) {
                 for (LocaleStore.LocaleInfo localeInfo :
-                        LocaleStore.getLevelLocales(
-                                context,
-                                new HashSet<String>(),
-                                (LocaleStore.LocaleInfo) null,
-                                true)) {
+                        LocaleStore.getLevelLocales(context, new HashSet<>(), null, true)) {
                     if (sameLanguageAndScript(localeInfo.getLocale(), locale)) {
-                        LocalePicker.updateLocales(
-                                new LocaleList(
-                                        ((LocaleStore.LocaleInfo)
-                                                        LocaleStore.getLevelLocales(
-                                                                        context,
-                                                                        new HashSet<String>(),
-                                                                        localeInfo,
-                                                                        true)
-                                                                .iterator()
-                                                                .next())
-                                                .getLocale()));
+                        LocaleStore.LocaleInfo region =
+                                LocaleStore.getLevelLocales(
+                                                context, new HashSet<>(), localeInfo, true)
+                                        .iterator()
+                                        .next();
+                        LocalePicker.updateLocales(new LocaleList(region.getLocale()));
                         Log.d("SetupWizardEventsReceiver", "Update region");
                         return;
                     }

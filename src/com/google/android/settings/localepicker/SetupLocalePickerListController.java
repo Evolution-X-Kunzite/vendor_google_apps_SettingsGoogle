@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.os.LocaleList;
 import android.provider.Settings;
 import android.util.Log;
-import android.util.Pair;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
@@ -35,18 +34,29 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class SetupLocalePickerListController implements RecyclerItemAdapter.OnItemSelectedListener {
+    private static final String TAG = "SetupLocalePickerListController";
+    private static final int PSKU_JAPAN = 1;
+    private static final int PSKU_UNITED_STATES = 2;
+    private static final ImmutableMap<String, Integer> PSKU_MAP =
+            ImmutableMap.of(
+                    "UVZ", PSKU_UNITED_STATES,
+                    "UAT", PSKU_UNITED_STATES,
+                    "UTM", PSKU_UNITED_STATES,
+                    "UGS", PSKU_UNITED_STATES,
+                    "AJP", PSKU_JAPAN);
+    private static final ImmutableList<String> REGION_SEARCH_SUPPORTED_LANGUAGES =
+            ImmutableList.of("ar", "en", "es", "fr");
+
     private Activity mActivity;
     private RecyclerItemAdapter mAdapter;
     private SectionItem mAllListGroup;
@@ -61,21 +71,6 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
     private String mPskuString;
     private SectionItem mSearchBarItem;
     private SectionItem mSuggestedListGroup;
-    private static final Map sPskuMap =
-            new ImmutableMap.Builder()
-                    .put("UVZ", 2)
-                    .put("UAT", 2)
-                    .put("UTM", 2)
-                    .put("UGS", 2)
-                    .put("AJP", 1)
-                    .build();
-    private static final ImmutableList REGION_SEARCH_SUPPORTED_LANGUAGES =
-            ImmutableList.builder()
-                    .add((Object) "ar")
-                    .add((Object) "en")
-                    .add((Object) "es")
-                    .add((Object) "fr")
-                    .build();
     private boolean mIsFromSearch = false;
     private List<LocaleStore.LocaleInfo> mSuggestedLocaleOptions = new ArrayList<>();
 
@@ -87,9 +82,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
         mPskuString = "";
         mParentLocale = localeInfo;
         mIsNumberingSystemMode = isNumberingSystemMode;
-        mLocaleList =
-                LocaleStore.getLevelLocales(
-                        context, new HashSet(), (LocaleStore.LocaleInfo) null, true);
+        mLocaleList = LocaleStore.getLevelLocales(context, new HashSet<>(), null, true);
         mContext = context;
         mActivity = activity;
         mLocaleOptions = new ArrayList<>(mLocaleList.size());
@@ -110,9 +103,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
         mSearchBarItem = (SectionItem) mAdapter.findItemById(R.id.setup_search_bar_section);
         mDividerItem = (SectionItem) mAdapter.findItemById(R.id.setup_divider_section);
         RecyclerView recyclerView =
-                (RecyclerView)
-                        mActivity.findViewById(
-                                com.google.android.setupdesign.R.id.sud_recycler_view);
+                mActivity.findViewById(com.google.android.setupdesign.R.id.sud_recycler_view);
         if (recyclerView != null) {
             recyclerView.setAccessibilityDelegateCompat(
                     new LocalePickerAccessibilityDelegate(recyclerView));
@@ -190,7 +181,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
             sortedLocaleList = new ArrayList<>();
         } else {
             LocaleStore.updateSimCountries(mContext);
-            mLocaleList = LocaleStore.getLevelLocales(mContext, new HashSet(), null, true);
+            mLocaleList = LocaleStore.getLevelLocales(mContext, new HashSet<>(), null, true);
             if (LocaleStore.isSimOrNwCountryAvailable()) {
                 suggestedLocaleListByPsku = getSortedLocaleList(getLanguageSuggestedLocaleList());
                 sortedLocaleList = getSortedLocaleList(getSupportedLocaleList());
@@ -228,11 +219,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
             mAllListGroup.removeChild(mAllListGroup.getHeader());
         }
         mIsFromSearch = true;
-        localeInfoList.stream()
-                .forEach(
-                        locale -> {
-                            addLocaleItem(locale, true, mSuggestedListGroup);
-                        });
+        localeInfoList.stream().forEach(locale -> addLocaleItem(locale, true, mSuggestedListGroup));
     }
 
     private void addLocaleItem(
@@ -249,20 +236,12 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
     }
 
     protected void setupItem(
-            List<LocaleStore.LocaleInfo> list, List<LocaleStore.LocaleInfo> list2) {
-        Log.d(
-                "SetupLocalePickerListController",
-                "setupItem: isNumberingMode = " + mIsNumberingSystemMode);
-        list.stream()
-                .forEach(
-                        locale -> {
-                            addLocaleItem(locale, true, mSuggestedListGroup);
-                        });
-        list2.stream()
-                .forEach(
-                        locale -> {
-                            addLocaleItem(locale, false, mAllListGroup);
-                        });
+            List<LocaleStore.LocaleInfo> suggestedLocales,
+            List<LocaleStore.LocaleInfo> allLocales) {
+        Log.d(TAG, "setupItem: isNumberingMode = " + mIsNumberingSystemMode);
+        suggestedLocales.stream()
+                .forEach(locale -> addLocaleItem(locale, true, mSuggestedListGroup));
+        allLocales.stream().forEach(locale -> addLocaleItem(locale, false, mAllListGroup));
         if (mSuggestedListGroup.getCount() == 0) {
             mSuggestedListGroup.clear();
         }
@@ -272,8 +251,8 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
     }
 
     @Override
-    public void onItemSelected(IItem iItem) {
-        if (iItem instanceof SearchBarItem) {
+    public void onItemSelected(IItem item) {
+        if (item instanceof SearchBarItem) {
             Bundle extras = mActivity.getIntent().getExtras();
             extras.putSerializable("extra_target_locale", mParentLocale);
             extras.putBoolean("extra_is_numbering_system", mParentLocale.hasNumberingSystems());
@@ -283,7 +262,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
             mActivity.startActivityForResult(intent, 0);
             return;
         }
-        LocaleItem localeItem = (LocaleItem) iItem;
+        LocaleItem localeItem = (LocaleItem) item;
         if (mParentLocale == null) {
             FeatureFactory.getFeatureFactory()
                     .getMetricsFeatureProvider()
@@ -293,8 +272,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
                                     ? SettingsEnums
                                             .ACTION_CHOOSE_PREFERRED_LANGUAGE_FROM_SUGGESTED_LIST_IN_SUW
                                     : SettingsEnums
-                                            .ACTION_CHOOSE_PREFERRED_LANGUAGE_FROM_ALL_LIST_IN_SUW,
-                            new Pair[0]);
+                                            .ACTION_CHOOSE_PREFERRED_LANGUAGE_FROM_ALL_LIST_IN_SUW);
             Settings.Global.putInt(
                     mContext.getContentResolver(),
                     "is_suggested_locale",
@@ -305,8 +283,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
                         .getMetricsFeatureProvider()
                         .action(
                                 mContext,
-                                SettingsEnums.ACTION_CHOOSE_REGION_AFTER_SEARCH_REGION_IN_SUW,
-                                new Pair[0]);
+                                SettingsEnums.ACTION_CHOOSE_REGION_AFTER_SEARCH_REGION_IN_SUW);
             } else {
                 FeatureFactory.getFeatureFactory()
                         .getMetricsFeatureProvider()
@@ -316,19 +293,16 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
                                         ? SettingsEnums
                                                 .ACTION_CHOOSE_PREFERRED_REGION_FROM_SUGGESTED_LIST_IN_SUW
                                         : SettingsEnums
-                                                .ACTION_CHOOSE_PREFERRED_REGION_FROM_ALL_LIST_IN_SUW,
-                                new Pair[0]);
+                                                .ACTION_CHOOSE_PREFERRED_REGION_FROM_ALL_LIST_IN_SUW);
             }
         }
         LocaleStore.LocaleInfo localeInfo = localeItem.getLocaleInfo();
         if (isFinalSelectedLocale(localeInfo)) {
             if (localeInfo.getLocale().getCountry().isEmpty()) {
                 localeInfo =
-                        (LocaleStore.LocaleInfo)
-                                LocaleStore.getLevelLocales(
-                                                mContext, new HashSet(), localeInfo, true)
-                                        .iterator()
-                                        .next();
+                        LocaleStore.getLevelLocales(mContext, new HashSet<>(), localeInfo, true)
+                                .iterator()
+                                .next();
             }
             mListener.onLocaleSelected(localeInfo);
             LocalePicker.updateLocales(new LocaleList(localeInfo.getLocale()));
@@ -338,12 +312,12 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
         if (localeInfo.getParent() == null) {
             LocalePicker.updateLocales(new LocaleList(localeInfo.getLocale()));
         }
-        Bundle extras2 = mActivity.getIntent().getExtras();
-        extras2.putSerializable("extra_target_locale", localeInfo);
-        extras2.putBoolean("extra_is_numbering_system", localeInfo.hasNumberingSystems());
-        Intent intent2 = new Intent("com.google.android.settings.localepicker.REGIONAND_PICKER");
-        intent2.putExtras(extras2);
-        mActivity.startActivityForResult(intent2, 0);
+        Bundle extras = mActivity.getIntent().getExtras();
+        extras.putSerializable("extra_target_locale", localeInfo);
+        extras.putBoolean("extra_is_numbering_system", localeInfo.hasNumberingSystems());
+        Intent intent = new Intent("com.google.android.settings.localepicker.REGIONAND_PICKER");
+        intent.putExtras(extras);
+        mActivity.startActivityForResult(intent, 0);
     }
 
     protected void initSuggestedListSectionItem(SectionItem suggestedListGroup) {
@@ -354,7 +328,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
         mAllListGroup = allListGroup;
     }
 
-    protected void initLocaleList(Set localeList) {
+    protected void initLocaleList(Set<LocaleStore.LocaleInfo> localeList) {
         mLocaleList = localeList;
     }
 
@@ -367,8 +341,9 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
     }
 
     protected List<LocaleStore.LocaleInfo> getTtsLocaleList() {
-        for (String str : getTtsLocalesFromStringArray()) {
-            mSuggestedLocaleOptions.add(LocaleStore.getLocaleInfo(Locale.forLanguageTag(str)));
+        for (String languageTag : getTtsLocalesFromStringArray()) {
+            mSuggestedLocaleOptions.add(
+                    LocaleStore.getLocaleInfo(Locale.forLanguageTag(languageTag)));
         }
         return mSuggestedLocaleOptions;
     }
@@ -381,54 +356,51 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
         if (mLocaleList != null && !mLocaleList.isEmpty()) {
             mLocaleOptions.addAll(mLocaleList);
         } else {
-            Log.d(
-                    "SetupLocalePickerListController",
-                    "Can not get locales because the locale list is null or empty.");
+            Log.d(TAG, "Can not get locales because the locale list is null or empty.");
         }
         return mLocaleOptions;
     }
 
     protected List<LocaleStore.LocaleInfo> getSuggestedLocaleListByPsku() {
-        for (String str : getSuggestedLocalesFromStringArray()) {
-            mSuggestedLocaleOptions.add(LocaleStore.getLocaleInfo(Locale.forLanguageTag(str)));
+        for (String languageTag : getSuggestedLocalesFromStringArray()) {
+            mSuggestedLocaleOptions.add(
+                    LocaleStore.getLocaleInfo(Locale.forLanguageTag(languageTag)));
         }
         return mSuggestedLocaleOptions;
     }
 
     protected List<LocaleStore.LocaleInfo> getSupportedLocaleListByPsku() {
-        ArrayList<LocaleStore.LocaleInfo> arrayList = new ArrayList<>();
+        List<LocaleStore.LocaleInfo> result = new ArrayList<>();
         if (mLocaleList != null && !mLocaleList.isEmpty()) {
-            HashMap<Locale, LocaleStore.LocaleInfo> hashMap = new HashMap(mLocaleList.size());
+            HashMap<Locale, LocaleStore.LocaleInfo> locales = new HashMap<>(mLocaleList.size());
             for (LocaleStore.LocaleInfo localeInfo : mLocaleList) {
                 if (!isPskuSuggestedLocale(localeInfo)) {
                     if (localeInfo.getLocale().getCountry().isEmpty()) {
                         if (localeInfo.isTranslated()) {
-                            hashMap.put(localeInfo.getLocale(), localeInfo);
+                            locales.put(localeInfo.getLocale(), localeInfo);
                         }
                     } else if (localeInfo.isTranslated()) {
-                        hashMap.put(
+                        locales.put(
                                 localeInfo.getParent(),
                                 LocaleStore.getLocaleInfo(localeInfo.getParent()));
                     }
                 }
             }
-            arrayList.addAll(hashMap.values());
-            return arrayList;
+            result.addAll(locales.values());
+            return result;
         }
-        Log.d(
-                "SetupLocalePickerListController",
-                "Can not get supported locales because the locale list is null or empty.");
-        return arrayList;
+        Log.d(TAG, "Can not get supported locales because the locale list is null or empty.");
+        return result;
     }
 
     private boolean isPskuSuggestedLocale(LocaleStore.LocaleInfo localeInfo) {
-        for (LocaleStore.LocaleInfo localeInfo2 : mSuggestedLocaleOptions) {
-            if (localeInfo2.getLocale().equals(localeInfo.getLocale())) {
+        for (LocaleStore.LocaleInfo suggested : mSuggestedLocaleOptions) {
+            if (suggested.getLocale().equals(localeInfo.getLocale())) {
                 return true;
             }
-            if (localeInfo2.getLocale().getCountry().isEmpty()
+            if (suggested.getLocale().getCountry().isEmpty()
                     && !localeInfo.getLocale().getCountry().isEmpty()
-                    && localeInfo2.getLocale().equals(localeInfo.getParent())) {
+                    && suggested.getLocale().equals(localeInfo.getParent())) {
                 return true;
             }
         }
@@ -436,84 +408,76 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
     }
 
     private String[] getSuggestedLocalesFromStringArray() {
-        int intValue = ((Integer) sPskuMap.getOrDefault(mPskuString, 0)).intValue();
-        if (intValue == 1) {
+        int psku = PSKU_MAP.getOrDefault(mPskuString, 0);
+        if (psku == PSKU_JAPAN) {
             return mContext.getResources().getStringArray(R.array.japan_locales);
         }
-        if (intValue == 2) {
+        if (psku == PSKU_UNITED_STATES) {
             return mContext.getResources().getStringArray(R.array.united_states_locales);
         }
         return mContext.getResources().getStringArray(R.array.global_locales);
     }
 
     protected List<LocaleStore.LocaleInfo> getLanguageSuggestedLocaleList() {
-        ArrayList<LocaleStore.LocaleInfo> arrayList = new ArrayList<>();
+        List<LocaleStore.LocaleInfo> result = new ArrayList<>();
         if (mLocaleList != null && !mLocaleList.isEmpty()) {
-            HashMap<Locale, LocaleStore.LocaleInfo> hashMap = new HashMap(mLocaleList.size());
+            HashMap<Locale, LocaleStore.LocaleInfo> locales = new HashMap<>(mLocaleList.size());
             for (LocaleStore.LocaleInfo localeInfo : mLocaleList) {
                 if (localeInfo.isSuggested()) {
-                    Locale build =
+                    Locale locale =
                             new Locale.Builder()
                                     .setLocale(localeInfo.getLocale().stripExtensions())
                                     .build();
-                    hashMap.put(build, LocaleStore.getLocaleInfo(build));
+                    locales.put(locale, LocaleStore.getLocaleInfo(locale));
                 }
             }
-            arrayList.addAll(hashMap.values());
-            return arrayList;
+            result.addAll(locales.values());
+            return result;
         }
-        Log.d(
-                "SetupLocalePickerListController",
-                "Can not get suggested locales because the locale list is null or empty.");
-        return arrayList;
+        Log.d(TAG, "Can not get suggested locales because the locale list is null or empty.");
+        return result;
     }
 
     protected List<LocaleStore.LocaleInfo> getSuggestedLocaleList() {
-        List<LocaleStore.LocaleInfo> arrayList = new ArrayList<>();
+        List<LocaleStore.LocaleInfo> result = new ArrayList<>();
         if (mLocaleList != null && !mLocaleList.isEmpty()) {
-            arrayList.addAll(
-                    (Collection)
-                            mLocaleList.stream()
-                                    .filter(localeInfo -> localeInfo.isSuggested())
-                                    .collect(Collectors.toList()));
-            return arrayList;
+            result.addAll(
+                    mLocaleList.stream()
+                            .filter(LocaleStore.LocaleInfo::isSuggested)
+                            .collect(Collectors.toList()));
+            return result;
         }
-        Log.d(
-                "SetupLocalePickerListController",
-                "Can not get suggested locales because the locale list is null or empty.");
-        return arrayList;
+        Log.d(TAG, "Can not get suggested locales because the locale list is null or empty.");
+        return result;
     }
 
     protected List<LocaleStore.LocaleInfo> getSupportedLocaleList() {
-        List<LocaleStore.LocaleInfo> arrayList = new ArrayList<>();
+        List<LocaleStore.LocaleInfo> result = new ArrayList<>();
         if (mLocaleList != null && !mLocaleList.isEmpty()) {
-            arrayList.addAll(
-                    (Collection)
-                            mLocaleList.stream()
-                                    .filter(localeInfo -> !localeInfo.isSuggested())
-                                    .collect(Collectors.toList()));
-            return arrayList;
+            result.addAll(
+                    mLocaleList.stream()
+                            .filter(localeInfo -> !localeInfo.isSuggested())
+                            .collect(Collectors.toList()));
+            return result;
         }
-        Log.d(
-                "SetupLocalePickerListController",
-                "Can not get supported locales because the locale list is null or empty.");
-        return arrayList;
+        Log.d(TAG, "Can not get supported locales because the locale list is null or empty.");
+        return result;
     }
 
     private List<LocaleStore.LocaleInfo> getSortedSuggestedRegionFromSearchList(
-            CharSequence charSequence,
-            List<LocaleStore.LocaleInfo> list,
-            List<LocaleStore.LocaleInfo> list2) {
-        ArrayList<LocaleStore.LocaleInfo> arrayList = new ArrayList<>();
-        if (charSequence == null || charSequence.toString().isEmpty()) {
-            return getSortedLocaleList(list2);
+            CharSequence prefix,
+            List<LocaleStore.LocaleInfo> searchResults,
+            List<LocaleStore.LocaleInfo> supportedLocales) {
+        List<LocaleStore.LocaleInfo> result = new ArrayList<>();
+        if (prefix == null || prefix.toString().isEmpty()) {
+            return getSortedLocaleList(supportedLocales);
         }
-        for (LocaleStore.LocaleInfo localeInfo : list) {
-            if (list2.contains(localeInfo)) {
-                arrayList.add(localeInfo);
+        for (LocaleStore.LocaleInfo localeInfo : searchResults) {
+            if (supportedLocales.contains(localeInfo)) {
+                result.add(localeInfo);
             }
         }
-        return getSortedLocaleList(arrayList);
+        return getSortedLocaleList(result);
     }
 
     protected List<LocaleStore.LocaleInfo> getSortedLocaleList(List<LocaleStore.LocaleInfo> list) {
@@ -535,23 +499,21 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
         if (REGION_SEARCH_SUPPORTED_LANGUAGES.contains(languageTag)) {
             return true;
         }
-        Log.d(
-                "SetupLocalePickerListController",
-                "Region search is not supported for " + languageTag);
+        Log.d(TAG, "Region search is not supported for " + languageTag);
         return false;
     }
 
     private boolean isFinalSelectedLocale(LocaleStore.LocaleInfo localeInfo) {
         boolean isSystemLocale = localeInfo.isSystemLocale();
-        boolean z = localeInfo.getParent() != null;
+        boolean isRegionLocale = localeInfo.getParent() != null;
         boolean hasNumberingSystems = localeInfo.hasNumberingSystems();
-        mLocaleList = LocaleStore.getLevelLocales(mContext, new HashSet(), localeInfo, true);
+        mLocaleList = LocaleStore.getLevelLocales(mContext, new HashSet<>(), localeInfo, true);
         Log.d(
-                "SetupLocalePickerListController",
+                TAG,
                 "isFinalSelectedLocale: isSystemLocale = "
                         + isSystemLocale
                         + ", isRegionLocale = "
-                        + z
+                        + isRegionLocale
                         + ", mayHaveDifferentNumberingSystem = "
                         + hasNumberingSystems
                         + ", isSuggested = "
@@ -561,7 +523,7 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
         return mLocaleList.size() == 1
                 || isSystemLocale
                 || localeInfo.isSuggested()
-                || (z && !hasNumberingSystems)
+                || (isRegionLocale && !hasNumberingSystems)
                 || mIsNumberingSystemMode;
     }
 
@@ -581,19 +543,16 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
                             if (childViewHolder instanceof ItemViewHolder) {
                                 IItem item = ((ItemViewHolder) childViewHolder).getItem();
                                 if (item instanceof LocaleItem) {
-                                    LocaleItem localeItem = (LocaleItem) item;
-                                    SectionItem sectionForItem = getSectionForItem(localeItem);
-                                    if (sectionForItem != null) {
+                                    SectionItem section = getSectionForItem(item);
+                                    if (section != null) {
                                         info.setCollectionItemInfo(
                                                 AccessibilityNodeInfoCompat.CollectionItemInfoCompat
                                                         .obtain(
-                                                                getIndexInSection(
-                                                                        sectionForItem, localeItem),
+                                                                getIndexInSection(section, item),
                                                                 1,
                                                                 0,
                                                                 1,
                                                                 false));
-                                        return;
                                     }
                                     return;
                                 }
@@ -611,17 +570,17 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
         @Override
         public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfoCompat info) {
             super.onInitializeAccessibilityNodeInfo(host, info);
-            View findAccessibilityFocusedChild = findAccessibilityFocusedChild(host);
-            if (findAccessibilityFocusedChild != null) {
+            View focusedChild = findAccessibilityFocusedChild(host);
+            if (focusedChild != null) {
                 RecyclerView.ViewHolder childViewHolder =
-                        ((RecyclerView) host).getChildViewHolder(findAccessibilityFocusedChild);
+                        ((RecyclerView) host).getChildViewHolder(focusedChild);
                 if (childViewHolder instanceof ItemViewHolder) {
-                    SectionItem sectionForItem =
+                    SectionItem section =
                             getSectionForItem(((ItemViewHolder) childViewHolder).getItem());
-                    if (sectionForItem != null) {
+                    if (section != null) {
                         info.setCollectionInfo(
                                 AccessibilityNodeInfoCompat.CollectionInfoCompat.obtain(
-                                        getTotalLocaleItemsInSection(sectionForItem), 1, false));
+                                        getTotalLocaleItemsInSection(section), 1, false));
                         return;
                     }
                 }
@@ -644,52 +603,52 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
             }
             ViewGroup viewGroup = (ViewGroup) view;
             for (int i = 0; i < viewGroup.getChildCount(); i++) {
-                View childAt = viewGroup.getChildAt(i);
-                if (childAt.isAccessibilityFocused()
-                        || ((childAt instanceof ViewGroup)
-                                && findAccessibilityFocusedChild(childAt) != null)) {
-                    return childAt;
+                View child = viewGroup.getChildAt(i);
+                if (child.isAccessibilityFocused()
+                        || ((child instanceof ViewGroup)
+                                && findAccessibilityFocusedChild(child) != null)) {
+                    return child;
                 }
             }
             return null;
         }
     }
 
-    public SectionItem getSectionForItem(IItem iItem) {
-        if (mSuggestedListGroup != null && isChildOf(mSuggestedListGroup, iItem)) {
+    public SectionItem getSectionForItem(IItem item) {
+        if (mSuggestedListGroup != null && isChildOf(mSuggestedListGroup, item)) {
             return mSuggestedListGroup;
         }
-        if (mAllListGroup != null && isChildOf(mAllListGroup, iItem)) {
+        if (mAllListGroup != null && isChildOf(mAllListGroup, item)) {
             return mAllListGroup;
         }
         return null;
     }
 
-    private boolean isChildOf(SectionItem sectionItem, IItem iItem) {
-        return getIndexInSection(sectionItem, iItem) >= 0;
+    private boolean isChildOf(SectionItem sectionItem, IItem item) {
+        return getIndexInSection(sectionItem, item) >= 0;
     }
 
-    public int getIndexInSection(SectionItem sectionItem, IItem iItem) {
-        int i = 0;
-        for (int i2 = 0; i2 < sectionItem.getCount(); i2++) {
-            IItem itemAt = sectionItem.getItemAt(i2);
-            if (itemAt == iItem) {
-                return i;
+    public int getIndexInSection(SectionItem sectionItem, IItem item) {
+        int localeIndex = 0;
+        for (int i = 0; i < sectionItem.getCount(); i++) {
+            IItem child = sectionItem.getItemAt(i);
+            if (child == item) {
+                return localeIndex;
             }
-            if (itemAt instanceof LocaleItem) {
-                i++;
+            if (child instanceof LocaleItem) {
+                localeIndex++;
             }
         }
         return -1;
     }
 
     public int getTotalLocaleItemsInSection(SectionItem sectionItem) {
-        int i = 0;
-        for (int i2 = 0; i2 < sectionItem.getCount(); i2++) {
-            if (sectionItem.getItemAt(i2) instanceof LocaleItem) {
-                i++;
+        int count = 0;
+        for (int i = 0; i < sectionItem.getCount(); i++) {
+            if (sectionItem.getItemAt(i) instanceof LocaleItem) {
+                count++;
             }
         }
-        return i;
+        return count;
     }
 }
