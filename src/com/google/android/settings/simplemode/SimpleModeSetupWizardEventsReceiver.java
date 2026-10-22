@@ -28,18 +28,20 @@ public final class SimpleModeSetupWizardEventsReceiver extends BroadcastReceiver
                 Log.d(TAG, "Skipping restore: no any backup data");
                 return;
             }
-            String[] strArrSplit = previousDeviceSettings.split(",");
-            if (strArrSplit.length != 7) {
+            String[] configs = previousDeviceSettings.split(",");
+            if (configs.length != 7) {
                 Log.d(TAG, "Skipping restore: data loss");
                 return;
             }
             boolean isSimpleViewEnabled = SimpleModeUtils.isSimpleViewEnabled(context);
-            boolean isPreviouslyEnabled = Boolean.valueOf(strArrSplit[0]).booleanValue();
-            int displaySize = Integer.valueOf(strArrSplit[1]).intValue();
-            float fontSize = Float.valueOf(strArrSplit[2]).floatValue();
-            String navMode = strArrSplit[3];
-            int touchTime = Integer.valueOf(strArrSplit[5]).intValue();
-            String gridOption = strArrSplit[6];
+            boolean isPreviouslyEnabled = Boolean.parseBoolean(configs[0]);
+            int displaySize = Integer.parseInt(configs[1]);
+            float fontSize = Float.parseFloat(configs[2]);
+            // Navigation mode isn't restored, but stock still parses its config and throws on
+            // malformed backup data.
+            Integer.parseInt(configs[4]);
+            int touchTime = Integer.parseInt(configs[5]);
+            String gridOption = configs[6];
             int restoreOption = getRestoreOption(isPreviouslyEnabled, isSimpleViewEnabled);
             Log.d(TAG, "restoreOption: " + restoreOption);
             if (restoreOption == 1) {

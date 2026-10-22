@@ -90,7 +90,7 @@ public class AccessibilityAppearanceProvider extends ContentProvider {
                 }
                 bundle.putBoolean(
                         "MATCHA_IS_PREVIOUSLY_ENABLED",
-                        Boolean.valueOf(previousDeviceSettings.split(",")[0]).booleanValue());
+                        Boolean.parseBoolean(previousDeviceSettings.split(",")[0]));
                 return bundle;
             case "METHOD_GET_PREVIOUS_ACCESSIBILITY_APPEARANCE_CONFIGS":
                 boolean isSimpleViewEnabled = SimpleModeUtils.isSimpleViewEnabled(getContext());

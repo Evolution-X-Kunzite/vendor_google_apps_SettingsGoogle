@@ -8,6 +8,7 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.om.IOverlayManager;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.RemoteException;
@@ -18,6 +19,7 @@ import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.WindowManagerGlobal;
+import android.view.WindowManagerPolicyConstants;
 import android.window.ConfigurationChangeSetting;
 
 import androidx.datastore.preferences.core.MutablePreferences;
@@ -28,6 +30,7 @@ import androidx.datastore.rxjava2.RxDataStore;
 
 import com.android.settings.R;
 import com.android.settings.overlay.FeatureFactory;
+import com.android.settingslib.display.DisplayDensityUtils;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -43,6 +46,14 @@ import java.util.concurrent.Executors;
 
 public abstract class SimpleModeUtils {
     private static final String TAG = "SimpleModeUtils";
+    private static final String SETTING_SIMPLE_VIEW_ENABLED = "matcha_enable";
+    private static final String SETTING_LAUNCHER_LAYOUT_PROVIDER = "launcher3.layout.provider";
+    private static final String SIMPLE_VIEW_LAUNCHER_AUTHORITY =
+            "com.android.settings.matcha.accessibilityappearanceprovider";
+    private static final String DATA_STORE_FEATURE_TOGGLE =
+            "simple_mode_data_store_data_for_feature_toggle";
+    private static final String DATA_STORE_BACKUP_RESTORE =
+            "simple_mode_data_store_data_for_backup_restore";
     private static final Executor sExecutor = Executors.newSingleThreadExecutor();
     private static final ImmutableList<String> ONE_GRID_OPTION =
             ImmutableList.of("small", "medium", "large", "xl");
@@ -74,7 +85,7 @@ public abstract class SimpleModeUtils {
     }
 
     private static int getSimpleViewNavigationModeConfig() {
-        return 0;
+        return WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
     }
 
     private static boolean isFoldable(Context context) {
@@ -100,10 +111,10 @@ public abstract class SimpleModeUtils {
     }
 
     private static String getNavigationMode(Context context) {
-        if (getNavigationModeConfig(context) == 0) {
-            return "com.android.internal.systemui.navbar.threebutton";
+        if (getNavigationModeConfig(context) == WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON) {
+            return WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON_OVERLAY;
         }
-        return "com.android.internal.systemui.navbar.gestural";
+        return WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL_OVERLAY;
     }
 
     private static Uri getUriForGridOption(String path) {
@@ -119,15 +130,13 @@ public abstract class SimpleModeUtils {
     }
 
     private static String getSimpleViewNavigationMode() {
-        return "com.android.internal.systemui.navbar.threebutton";
+        return WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON_OVERLAY;
     }
 
     private static float getSimpleViewFontSize(Context context) {
-        return Float.valueOf(
-                        context.getResources()
-                                .getStringArray(
-                                        com.android.settingslib.R.array.entryvalues_font_size)[2])
-                .floatValue();
+        return Float.parseFloat(
+                context.getResources()
+                        .getStringArray(com.android.settingslib.R.array.entryvalues_font_size)[2]);
     }
 
     private static int getSimpleViewTouchTime(Context context) {
@@ -141,36 +150,31 @@ public abstract class SimpleModeUtils {
     }
 
     protected static void setFeatureToggleStatus(Context context, int status) {
-        Settings.Secure.putInt(context.getContentResolver(), "matcha_enable", status);
+        Settings.Secure.putInt(context.getContentResolver(), SETTING_SIMPLE_VIEW_ENABLED, status);
     }
 
     private static String getGridOption(Context context) {
-        String str = "small";
-        try {
-            Cursor cursor =
-                    context.getContentResolver()
-                            .query(getUriForGridOption("list_options"), null, null, null, null);
-            if (cursor != null) {
-                while (cursor.moveToNext()) {
-                    String name = cursor.getString(cursor.getColumnIndex("name"));
-                    if (Boolean.parseBoolean(
-                            cursor.getString(cursor.getColumnIndex("is_default")))) {
-                        str = name;
-                        break;
-                    }
+        String gridOption = "small";
+        try (Cursor cursor =
+                context.getContentResolver()
+                        .query(getUriForGridOption("list_options"), null, null, null, null)) {
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(cursor.getColumnIndex("name"));
+                if (Boolean.parseBoolean(cursor.getString(cursor.getColumnIndex("is_default")))) {
+                    gridOption = name;
+                    break;
                 }
-                cursor.close();
             }
-            return str;
+            return gridOption;
         } catch (Exception e) {
             Log.e(TAG, "Failed to get list options", e);
             return "small";
         }
     }
 
-    private static ContentValues getGridOptionContentValue(String str) {
+    private static ContentValues getGridOptionContentValue(String gridOption) {
         ContentValues contentValues = new ContentValues();
-        contentValues.put("name", str);
+        contentValues.put("name", gridOption);
         contentValues.put("enable_apply_button", Boolean.FALSE);
         return contentValues;
     }
@@ -199,9 +203,7 @@ public abstract class SimpleModeUtils {
 
     protected static String getDataForFeatureToggle(Context context) {
         RxDataStore<Preferences> rxDataStore =
-                new RxPreferenceDataStoreBuilder(
-                                context, "simple_mode_data_store_data_for_feature_toggle")
-                        .build();
+                new RxPreferenceDataStoreBuilder(context, DATA_STORE_FEATURE_TOGGLE).build();
         Preferences preferences = rxDataStore.data().blockingFirst();
         int displaySize = preferences.get(KEY_USER_DISPLAY_SIZE);
         float fontSize = preferences.get(KEY_USER_FONT_SIZE);
@@ -227,28 +229,26 @@ public abstract class SimpleModeUtils {
                 + String.valueOf(initTime);
     }
 
-    private static void restoreUserConfigs(Context context, String[] strArr) {
+    private static void restoreUserConfigs(Context context, String[] configs) {
         setupAccessibilityAppearance(
                 context,
-                Integer.valueOf(strArr[0]).intValue(),
-                Float.valueOf(strArr[1]).floatValue(),
-                strArr[2],
-                Integer.valueOf(strArr[3]).intValue(),
-                Integer.valueOf(strArr[4]).intValue(),
-                strArr[5]);
+                Integer.parseInt(configs[0]),
+                Float.parseFloat(configs[1]),
+                configs[2],
+                Integer.parseInt(configs[3]),
+                Integer.parseInt(configs[4]),
+                configs[5]);
     }
 
-    private static void backupDeviceLauncherAuthority(Context context, final String str) {
+    private static void backupDeviceLauncherAuthority(Context context, String authority) {
         RxDataStore<Preferences> rxDataStore =
-                new RxPreferenceDataStoreBuilder(
-                                context, "simple_mode_data_store_data_for_feature_toggle")
-                        .build();
+                new RxPreferenceDataStoreBuilder(context, DATA_STORE_FEATURE_TOGGLE).build();
         rxDataStore
                 .updateDataAsync(
                         preferences -> {
                             MutablePreferences mutablePreferences =
                                     preferences.toMutablePreferences();
-                            mutablePreferences.set(KEY_DEVICE_LAUNCHER_AUTHORITY, str);
+                            mutablePreferences.set(KEY_DEVICE_LAUNCHER_AUTHORITY, authority);
                             return Single.just(mutablePreferences);
                         })
                 .blockingGet();
@@ -258,11 +258,8 @@ public abstract class SimpleModeUtils {
 
     private static void backupUserConfigs(Context context) {
         RxDataStore<Preferences> rxDataStore =
-                new RxPreferenceDataStoreBuilder(
-                                context, "simple_mode_data_store_data_for_feature_toggle")
-                        .build();
-        com.android.settingslib.display.DisplayDensityUtils displayDensityUtils =
-                new com.android.settingslib.display.DisplayDensityUtils(context);
+                new RxPreferenceDataStoreBuilder(context, DATA_STORE_FEATURE_TOGGLE).build();
+        DisplayDensityUtils displayDensityUtils = new DisplayDensityUtils(context);
         ContentResolver contentResolver = context.getContentResolver();
         String[] fontSizeArray =
                 context.getResources()
@@ -273,13 +270,15 @@ public abstract class SimpleModeUtils {
         final float fontSize =
                 Settings.System.getFloat(
                         contentResolver,
-                        "font_scale",
-                        Float.valueOf(fontSizeArray[1]).floatValue());
+                        Settings.System.FONT_SCALE,
+                        Float.parseFloat(fontSizeArray[1]));
         final String navMode = getNavigationMode(context);
         final int navModeConfig = getNavigationModeConfig(context);
         final int touchTime =
                 Settings.Secure.getInt(
-                        contentResolver, "long_press_timeout", Integer.parseInt(touchTimeArray[0]));
+                        contentResolver,
+                        Settings.Secure.LONG_PRESS_TIMEOUT,
+                        Integer.parseInt(touchTimeArray[0]));
         final String gridOption = getGridOption(context);
         final long initTime = System.currentTimeMillis();
         rxDataStore
@@ -317,16 +316,14 @@ public abstract class SimpleModeUtils {
                     setSimpleViewConfigs(context);
                     if (isFromSuw) {
                         setComponentsStatusForSuw(context, false);
-                        String string =
+                        String authority =
                                 Settings.Secure.getString(
-                                        context.getContentResolver(), "launcher3.layout.provider");
-                        if (!"com.android.settings.matcha.accessibilityappearanceprovider"
-                                .equals(string)) {
-                            backupDeviceLauncherAuthority(context, string);
+                                        context.getContentResolver(),
+                                        SETTING_LAUNCHER_LAYOUT_PROVIDER);
+                        if (!SIMPLE_VIEW_LAUNCHER_AUTHORITY.equals(authority)) {
+                            backupDeviceLauncherAuthority(context, authority);
                         }
-                        setLauncherLayout(
-                                context,
-                                "com.android.settings.matcha.accessibilityappearanceprovider");
+                        setLauncherLayout(context, SIMPLE_VIEW_LAUNCHER_AUTHORITY);
                     }
                     Trace.endSection();
                     Log.d(TAG, "enableSimpleViewFromSetupWizard:" + isFromSuw);
@@ -346,26 +343,24 @@ public abstract class SimpleModeUtils {
         sExecutor.execute(
                 () -> {
                     Trace.beginSection("disableSimpleView");
-                    String[] strArrSplit = getDataForFeatureToggle(context).split(",");
-                    restoreUserConfigs(context, strArrSplit);
-                    long initTime = Long.parseLong(strArrSplit[6]);
+                    String[] configs = getDataForFeatureToggle(context).split(",");
+                    restoreUserConfigs(context, configs);
+                    long initTime = Long.parseLong(configs[6]);
                     if (isFromSuw) {
                         setComponentsStatusForSuw(context, true);
-                        String string =
+                        String authority =
                                 Settings.Secure.getString(
-                                        context.getContentResolver(), "launcher3.layout.provider");
+                                        context.getContentResolver(),
+                                        SETTING_LAUNCHER_LAYOUT_PROVIDER);
                         RxDataStore<Preferences> rxDataStore =
-                                new RxPreferenceDataStoreBuilder(
-                                                context,
-                                                "simple_mode_data_store_data_for_feature_toggle")
+                                new RxPreferenceDataStoreBuilder(context, DATA_STORE_FEATURE_TOGGLE)
                                         .build();
                         String launcherAuthority =
                                 rxDataStore
                                         .data()
                                         .blockingFirst()
                                         .get(KEY_DEVICE_LAUNCHER_AUTHORITY);
-                        if ("com.android.settings.matcha.accessibilityappearanceprovider"
-                                .equals(string)) {
+                        if (SIMPLE_VIEW_LAUNCHER_AUTHORITY.equals(authority)) {
                             setLauncherLayout(context, launcherAuthority);
                         }
                         rxDataStore.dispose();
@@ -384,32 +379,32 @@ public abstract class SimpleModeUtils {
                 });
     }
 
-    protected static void setLauncherLayout(Context context, String str) {
-        Settings.Secure.putString(context.getContentResolver(), "launcher3.layout.provider", str);
+    protected static void setLauncherLayout(Context context, String authority) {
+        Settings.Secure.putString(
+                context.getContentResolver(), SETTING_LAUNCHER_LAYOUT_PROVIDER, authority);
     }
 
     protected static boolean isFontOrDisplaySmaller(Context context) {
         ContentResolver contentResolver = context.getContentResolver();
-        return new com.android.settingslib.display.DisplayDensityUtils(context).getCurrentIndex()
-                        > getSimpleViewDisplaySizeIndex()
+        return new DisplayDensityUtils(context).getCurrentIndex() > getSimpleViewDisplaySizeIndex()
                 || Settings.System.getFloat(
                                 contentResolver,
-                                "font_scale",
-                                Float.valueOf(
-                                                context.getResources()
-                                                        .getStringArray(
-                                                                com.android.settingslib.R.array
-                                                                        .entryvalues_font_size)[1])
-                                        .floatValue())
+                                Settings.System.FONT_SCALE,
+                                Float.parseFloat(
+                                        context.getResources()
+                                                .getStringArray(
+                                                        com.android.settingslib.R.array
+                                                                .entryvalues_font_size)[1]))
                         > getSimpleViewFontSize(context);
     }
 
     protected static boolean isSimpleViewEnabled(Context context) {
-        return Settings.Secure.getInt(context.getContentResolver(), "matcha_enable", 0) == 1;
+        return Settings.Secure.getInt(context.getContentResolver(), SETTING_SIMPLE_VIEW_ENABLED, 0)
+                == 1;
     }
 
     protected static boolean isCallingFromSUWEntryPoint(Activity activity) {
-        if (activity == null || activity.getCallingPackage() == null) {
+        if (activity.getCallingPackage() == null) {
             return false;
         }
         return activity.getCallingPackage().equals("com.google.android.pixel.setupwizard");
@@ -440,7 +435,13 @@ public abstract class SimpleModeUtils {
 
     private static void setComponentEnabledSetting(
             Context context, ComponentName componentName, boolean enabled) {
-        context.getPackageManager().setComponentEnabledSetting(componentName, enabled ? 1 : 2, 1);
+        context.getPackageManager()
+                .setComponentEnabledSetting(
+                        componentName,
+                        enabled
+                                ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                                : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                        PackageManager.DONT_KILL_APP);
     }
 
     protected static void setWallpaper(Context context) {
@@ -452,21 +453,19 @@ public abstract class SimpleModeUtils {
         }
     }
 
-    protected static void overrideDataStore(Context context, String str) {
-        String[] strArrSplit = str.split(",");
-        if (strArrSplit.length == 8 && strArrSplit[0].equals("true")) {
+    protected static void overrideDataStore(Context context, String data) {
+        String[] configs = data.split(",");
+        if (configs.length == 8 && configs[0].equals("true")) {
             Log.d(TAG, "overrideDataStore");
             RxDataStore<Preferences> rxDataStore =
-                    new RxPreferenceDataStoreBuilder(
-                                    context, "simple_mode_data_store_data_for_feature_toggle")
-                            .build();
-            final int displaySize = Integer.valueOf(strArrSplit[1]).intValue();
-            final float fontSize = Float.valueOf(strArrSplit[2]).floatValue();
-            final String navMode = strArrSplit[3];
-            final int navModeConfig = Integer.valueOf(strArrSplit[4]).intValue();
-            final int touchTime = Integer.valueOf(strArrSplit[5]).intValue();
-            final String gridOption = strArrSplit[6];
-            final long initTime = Long.parseLong(strArrSplit[7]);
+                    new RxPreferenceDataStoreBuilder(context, DATA_STORE_FEATURE_TOGGLE).build();
+            final int displaySize = Integer.parseInt(configs[1]);
+            final float fontSize = Float.parseFloat(configs[2]);
+            final String navMode = configs[3];
+            final int navModeConfig = Integer.parseInt(configs[4]);
+            final int touchTime = Integer.parseInt(configs[5]);
+            final String gridOption = configs[6];
+            final long initTime = Long.parseLong(configs[7]);
             Log.d(TAG, "overrideDataStore-initTimeFromBackup:" + initTime);
             rxDataStore
                     .updateDataAsync(
@@ -493,8 +492,7 @@ public abstract class SimpleModeUtils {
     }
 
     protected static String getCurrentAccessibilityAppearanceConfigs(Context context) {
-        com.android.settingslib.display.DisplayDensityUtils displayDensityUtils =
-                new com.android.settingslib.display.DisplayDensityUtils(context);
+        DisplayDensityUtils displayDensityUtils = new DisplayDensityUtils(context);
         ContentResolver contentResolver = context.getContentResolver();
         String[] fontSizeArray =
                 context.getResources()
@@ -506,13 +504,15 @@ public abstract class SimpleModeUtils {
         float fontSize =
                 Settings.System.getFloat(
                         contentResolver,
-                        "font_scale",
-                        Float.valueOf(fontSizeArray[1]).floatValue());
+                        Settings.System.FONT_SCALE,
+                        Float.parseFloat(fontSizeArray[1]));
         String navMode = getNavigationMode(context);
         int navModeConfig = getNavigationModeConfig(context);
         int touchTime =
                 Settings.Secure.getInt(
-                        contentResolver, "long_press_timeout", Integer.parseInt(touchTimeArray[0]));
+                        contentResolver,
+                        Settings.Secure.LONG_PRESS_TIMEOUT,
+                        Integer.parseInt(touchTimeArray[0]));
         return String.valueOf(isSimpleViewEnabled)
                 + ","
                 + String.valueOf(displaySize)
@@ -528,13 +528,13 @@ public abstract class SimpleModeUtils {
                 + getGridOption(context);
     }
 
-    protected static void restoreCurrentAccessibilityAppearance(Context context, final String str) {
-        if (Strings.isNullOrEmpty(str)) {
+    protected static void restoreCurrentAccessibilityAppearance(Context context, String data) {
+        if (Strings.isNullOrEmpty(data)) {
             Log.d(TAG, "Skipping restore: no any backup data");
             return;
         }
-        String[] strArrSplit = str.split(",");
-        if (strArrSplit.length != 7) {
+        String[] configs = data.split(",");
+        if (configs.length != 7) {
             Log.d(TAG, "Skipping restore: data loss");
             return;
         }
@@ -543,17 +543,15 @@ public abstract class SimpleModeUtils {
                 .action(
                         context,
                         SettingsEnums.ACTION_RESTORE_SIMPLE_VIEW_RESULT_IN_SUW,
-                        Boolean.parseBoolean(strArrSplit[0]));
+                        Boolean.parseBoolean(configs[0]));
         RxDataStore<Preferences> rxDataStore =
-                new RxPreferenceDataStoreBuilder(
-                                context, "simple_mode_data_store_data_for_backup_restore")
-                        .build();
+                new RxPreferenceDataStoreBuilder(context, DATA_STORE_BACKUP_RESTORE).build();
         rxDataStore
                 .updateDataAsync(
                         preferences -> {
                             MutablePreferences mutablePreferences =
                                     preferences.toMutablePreferences();
-                            mutablePreferences.set(KEY_PREVIOUS_DEVICE_SETTINGS, str);
+                            mutablePreferences.set(KEY_PREVIOUS_DEVICE_SETTINGS, data);
                             return Single.just(mutablePreferences);
                         })
                 .blockingGet();
@@ -569,8 +567,7 @@ public abstract class SimpleModeUtils {
             int navModeConfig,
             int touchTime,
             String gridOption) {
-        com.android.settingslib.display.DisplayDensityUtils displayDensityUtils =
-                new com.android.settingslib.display.DisplayDensityUtils(context);
+        DisplayDensityUtils displayDensityUtils = new DisplayDensityUtils(context);
         ContentResolver contentResolver = context.getContentResolver();
         IOverlayManager overlayManager =
                 IOverlayManager.Stub.asInterface(ServiceManager.getService("overlay"));
@@ -587,12 +584,13 @@ public abstract class SimpleModeUtils {
         if (navMode != null && navModeConfig != -1) {
             try {
                 overlayManager.setEnabledExclusiveInCategory(navMode, UserHandle.USER_CURRENT);
-                Settings.Secure.putInt(contentResolver, "navigation_mode", navModeConfig);
+                Settings.Secure.putInt(
+                        contentResolver, Settings.Secure.NAVIGATION_MODE, navModeConfig);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
         }
-        Settings.Secure.putInt(contentResolver, "long_press_timeout", touchTime);
+        Settings.Secure.putInt(contentResolver, Settings.Secure.LONG_PRESS_TIMEOUT, touchTime);
         if (gridOption != null) {
             if (!isOneGridOption(gridOption)) {
                 gridOption = remapToOneGridOption(gridOption);
@@ -605,13 +603,12 @@ public abstract class SimpleModeUtils {
 
     protected static String getPreviousDeviceSettings(Context context) {
         RxDataStore<Preferences> rxDataStore =
-                new RxPreferenceDataStoreBuilder(
-                                context, "simple_mode_data_store_data_for_backup_restore")
-                        .build();
-        String str = rxDataStore.data().blockingFirst().get(KEY_PREVIOUS_DEVICE_SETTINGS);
+                new RxPreferenceDataStoreBuilder(context, DATA_STORE_BACKUP_RESTORE).build();
+        String previousDeviceSettings =
+                rxDataStore.data().blockingFirst().get(KEY_PREVIOUS_DEVICE_SETTINGS);
         rxDataStore.dispose();
         rxDataStore.shutdownComplete().blockingAwait();
-        return str;
+        return previousDeviceSettings;
     }
 
     protected static int getAccumulatedTimeLevel(long initTime) {
@@ -629,23 +626,20 @@ public abstract class SimpleModeUtils {
         return duration > FIVE_MINUTES ? 2 : 1;
     }
 
-    private static boolean isOneGridOption(String str) {
-        return ONE_GRID_OPTION.contains(str);
+    private static boolean isOneGridOption(String gridOption) {
+        return ONE_GRID_OPTION.contains(gridOption);
     }
 
-    private static String remapToOneGridOption(String str) {
-        switch (str.hashCode()) {
-            case -1039745817:
-                str.equals("normal");
-                return "small";
-            case -621369835:
-                return str.equals("practical") ? "medium" : "small";
-            case 97536:
-                return str.equals("big") ? "large" : "small";
-            case 723019166:
-                return str.equals("reasonable") ? "medium" : "small";
-            case 2063491154:
-                return str.equals("crazy_big") ? "xl" : "small";
+    private static String remapToOneGridOption(String gridOption) {
+        switch (gridOption) {
+            case "practical":
+            case "reasonable":
+                return "medium";
+            case "big":
+                return "large";
+            case "crazy_big":
+                return "xl";
+            case "normal":
             default:
                 return "small";
         }

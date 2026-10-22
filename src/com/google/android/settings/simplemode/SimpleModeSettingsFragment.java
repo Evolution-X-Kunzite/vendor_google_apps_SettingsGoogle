@@ -51,26 +51,22 @@ public class SimpleModeSettingsFragment extends DashboardFragment {
     public View onCreateView(LayoutInflater layoutInflater, ViewGroup viewGroup, Bundle bundle) {
         TopIntroPreference topIntroPreference =
                 (TopIntroPreference) findPreference("simple_mode_top_description");
-        if (topIntroPreference != null) {
-            if (SimpleModeUtils.isCallingFromSUWEntryPoint(getActivity())) {
-                topIntroPreference.setTitle(
-                        getContext().getString(R.string.simple_mode_suw_description));
-            } else {
-                topIntroPreference.setHyperlinkListener(v -> openLearnMorePage());
-            }
+        if (SimpleModeUtils.isCallingFromSUWEntryPoint(getActivity())) {
+            topIntroPreference.setTitle(
+                    getContext().getString(R.string.simple_mode_suw_description));
+        } else {
+            topIntroPreference.setHyperlinkListener(v -> openLearnMorePage());
         }
         IllustrationPreference illustrationPreference =
                 (IllustrationPreference) findPreference("simple_mode_preview");
-        if (illustrationPreference != null) {
-            if (shouldEnableExpressiveStyleInSuw() || shouldEnableExpressiveStyleInSettings()) {
-                illustrationPreference.applyDynamicColor();
-                illustrationPreference.setLottieAnimationResId(R.raw.simple_mode_preview);
-                illustrationPreference.setOnBindListener(
-                        this::handleIllustrationAnimationForSetupWizard);
-            } else {
-                illustrationPreference.setLottieAnimationResId(
-                        R.raw.simple_mode_pre_expressive_preview);
-            }
+        if (shouldEnableExpressiveStyleInSuw() || shouldEnableExpressiveStyleInSettings()) {
+            illustrationPreference.applyDynamicColor();
+            illustrationPreference.setLottieAnimationResId(R.raw.simple_mode_preview);
+            illustrationPreference.setOnBindListener(
+                    this::handleIllustrationAnimationForSetupWizard);
+        } else {
+            illustrationPreference.setLottieAnimationResId(
+                    R.raw.simple_mode_pre_expressive_preview);
         }
         return super.onCreateView(layoutInflater, viewGroup, bundle);
     }

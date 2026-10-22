@@ -21,9 +21,7 @@ public class TextViewPreference extends Preference {
     public void onBindViewHolder(PreferenceViewHolder preferenceViewHolder) {
         super.onBindViewHolder(preferenceViewHolder);
         TextView textView = (TextView) preferenceViewHolder.findViewById(R.id.top_content);
-        if (textView != null) {
-            textView.setMovementMethod(LinkMovementMethod.getInstance());
-            textView.setText(getTitle());
-        }
+        textView.setMovementMethod(LinkMovementMethod.getInstance());
+        textView.setText(getTitle());
     }
 }
