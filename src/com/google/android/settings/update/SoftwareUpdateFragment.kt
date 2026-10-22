@@ -4,8 +4,10 @@ import android.app.settings.SettingsEnums
 import android.content.Context
 import com.android.settings.dashboard.DashboardFragment
 import com.android.settings.search.BaseSearchIndexProvider
+import com.android.settingslib.search.SearchIndexable
 import com.google.android.settings.R
 
+@SearchIndexable
 class SoftwareUpdateFragment : DashboardFragment() {
 
     override fun getMetricsCategory(): Int = SettingsEnums.SETTINGS_SOFTWARE_UPDATES

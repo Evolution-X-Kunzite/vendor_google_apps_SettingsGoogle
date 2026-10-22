@@ -15,7 +15,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.android.settings.accessibility.AccessibilitySetupWizardUtils;
 import com.android.settings.dashboard.DashboardFragment;
 import com.android.settings.search.BaseSearchIndexProvider;
-import com.android.settingslib.search.SearchIndexable;
 import com.android.settingslib.widget.IllustrationPreference;
 import com.android.settingslib.widget.LottieColorUtils;
 import com.android.settingslib.widget.SettingsThemeHelper;
@@ -29,7 +28,6 @@ import com.google.android.setupdesign.GlifPreferenceLayout;
 import com.google.android.setupdesign.template.IconMixin;
 import com.google.android.setupdesign.util.ThemeHelper;
 
-@SearchIndexable(forTarget = SearchIndexable.ALL & ~SearchIndexable.ARC)
 public class SimpleModeSettingsFragment extends DashboardFragment {
     public static final BaseSearchIndexProvider SEARCH_INDEX_DATA_PROVIDER =
             new BaseSearchIndexProvider(R.xml.simple_mode_settings) {
