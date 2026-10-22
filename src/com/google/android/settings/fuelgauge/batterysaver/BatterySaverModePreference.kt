@@ -23,7 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-abstract class BatterySaverModePreference(protected val dataStore: BatterySaverModeDataStore) :
+sealed class BatterySaverModePreference(protected val dataStore: BatterySaverModeDataStore) :
     BooleanValuePreference,
     PreferenceBinding,
     Preference.OnPreferenceClickListener,

@@ -25,6 +25,7 @@ class BatterySaverGoogleApiScreen :
         topLevelSettingsCategory = Category.BATTERY,
         fragment = BatterySaverSettings::class,
         purpose = AR.string.battery_saver_screen_purpose,
+        alreadyPartiallyMigrated = BatterySaverGoogleScreen::class,
     ) {
 
     init {

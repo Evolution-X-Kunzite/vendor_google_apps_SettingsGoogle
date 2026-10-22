@@ -64,9 +64,7 @@ public class BatterySaverModePreferenceController extends BasePreferenceControll
         super.displayPreference(screen);
         PreferenceCategory preferenceCategory = screen.findPreference(getPreferenceKey());
         if (!mIsFlipendoInstalled) {
-            if (preferenceCategory != null) { // does not exist?
-                preferenceCategory.setVisible(false);
-            }
+            preferenceCategory.setVisible(false);
         } else if (preferenceCategory != null) {
             refreshFlipendoStates();
             initRadioButton(preferenceCategory);
@@ -81,7 +79,7 @@ public class BatterySaverModePreferenceController extends BasePreferenceControll
         } else if (KEY_BASIC_SAVER.equals(key)) {
             updateSaverModeSelection(true);
         }
-        if (mIsFlipendoEnabled && mExtremePreference != null) { // non-existent check?
+        if (mIsFlipendoEnabled) {
             mCurrentBatterySaverMode = mExtremePreference.isChecked();
         }
     }
@@ -110,13 +108,11 @@ public class BatterySaverModePreferenceController extends BasePreferenceControll
     public void onPause() {
         if (mIsFlipendoInstalled) {
             mContext.getContentResolver().unregisterContentObserver(mContentObserver);
-            if (mBasicPreference == null
-                    || mCurrentBatterySaverMode == mBasicPreference.isChecked()) {
+            if (mCurrentBatterySaverMode == mBasicPreference.isChecked()) {
                 return;
             }
             if (!mIsFlipendoAggressiveMode
                     && mIsFlipendoEnabled
-                    && mExtremePreference != null // ?
                     && mExtremePreference.isChecked()) {
                 return;
             }

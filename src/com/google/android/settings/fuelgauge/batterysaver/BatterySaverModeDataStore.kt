@@ -12,7 +12,7 @@ import com.android.settingslib.datastore.KeyValueStore
 class BatterySaverModeDataStore(private val context: Context) :
     AbstractKeyedDataObservable<String>(), KeyValueStore {
 
-    private var contentObserver: ContentObserver? = null
+    private lateinit var contentObserver: ContentObserver
     private var isFlipendoAggressiveMode = false
     private var isFlipendoEnabled = false
     private val isFlipendoInstalled = FlipendoUtils.isFlipendoInstalled(context)
@@ -70,13 +70,13 @@ class BatterySaverModeDataStore(private val context: Context) :
             context.contentResolver.registerContentObserver(
                 FlipendoUtils.FLIPENDO_ENABLED_OBSERVABLE_URI,
                 false,
-                contentObserver!!,
+                contentObserver,
             )
         }
     }
 
     override fun onLastObserverRemoved() {
-        contentObserver?.let { context.contentResolver.unregisterContentObserver(it) }
+        context.contentResolver.unregisterContentObserver(contentObserver)
     }
 
     fun refreshFlipendoStates(notify: Boolean) {
