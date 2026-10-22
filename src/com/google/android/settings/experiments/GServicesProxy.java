@@ -30,8 +30,9 @@ public abstract class GServicesProxy {
     public static String getString(
             ContentResolver contentResolver, String key, String defaultValue) {
         Bundle request = buildRequest(key);
-        request.putString("default", defaultValue);
         Bundle result = getResult(contentResolver, "getStringForKey", request);
+        // Matches stock: the default is added after the query, so the provider never sees it.
+        request.putString("default", defaultValue);
         return result == null ? defaultValue : result.getString("value", defaultValue);
     }
 
@@ -57,9 +58,6 @@ public abstract class GServicesProxy {
                                 try (ContentProviderClient client =
                                         contentResolver.acquireUnstableContentProviderClient(
                                                 PROXY_AUTHORITY)) {
-                                    if (client == null) {
-                                        return null;
-                                    }
                                     return client.call(method, null, extras);
                                 }
                             });

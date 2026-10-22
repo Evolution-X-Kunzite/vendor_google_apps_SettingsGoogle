@@ -87,9 +87,6 @@ public abstract class PhenotypeProxy {
                 context.getApplicationContext()
                         .getContentResolver()
                         .acquireUnstableContentProviderClient(PROXY_AUTHORITY)) {
-            if (client == null) {
-                return null;
-            }
             return client.call(method, null, request);
         } catch (Exception e) {
             Log.e(TAG, "Failed to query experiment provider", e);
