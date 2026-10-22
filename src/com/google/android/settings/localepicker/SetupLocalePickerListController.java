@@ -155,10 +155,12 @@ public class SetupLocalePickerListController implements RecyclerItemAdapter.OnIt
             }
             mSuggestedListGroup
                     .getHeader()
-                    .setTitleColor(mContext.getColor(com.android.internal.R.color.profile_badge_2));
+                    .setTitleColor(
+                            mContext.getColor(com.android.internal.R.color.materialColorPrimary));
             mAllListGroup
                     .getHeader()
-                    .setTitleColor(mContext.getColor(com.android.internal.R.color.profile_badge_2));
+                    .setTitleColor(
+                            mContext.getColor(com.android.internal.R.color.materialColorPrimary));
             return;
         }
         boolean shouldApplyGlifExpressiveStyle =
